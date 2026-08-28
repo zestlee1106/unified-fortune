@@ -76,6 +76,17 @@ export function rarityHeadline(r: Rarity): string {
   return `${commas(r.oneIn)}명 중 한 명`
 }
 
+/** 공유 카드처럼 자리가 좁은 곳에서 쓴다. 412,518 -> 41만 */
+export function rarityCompact(r: Rarity): string {
+  const n = r.oneIn
+  if (n >= 10000) {
+    const man = n / 10000
+    const label = man >= 10 ? String(Math.round(man)) : man.toFixed(1)
+    return `${label}만 명 중 한 명`
+  }
+  return `${commas(n)}명 중 한 명`
+}
+
 export function rarityKorea(r: Rarity): string {
   const n = r.inKorea
   if (n < 1) return '전국에 당신 한 명뿐일 수도 있습니다'

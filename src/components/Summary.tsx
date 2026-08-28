@@ -3,6 +3,7 @@ import { josa } from '../core/josa'
 import { supportersOf } from '../core/persona'
 import type { Persona } from '../core/persona'
 import { computeRarity, rarityHeadline, rarityKorea } from '../core/rarity'
+import { SAMPLE_SIZE, topPercentFor } from '../data/percentile'
 import type { Consensus } from '../core/consensus'
 import type { BirthInput, Reading } from '../core/types'
 
@@ -69,6 +70,10 @@ export function Summary({ input, persona, consensus, readings }: Props) {
 
       <Dial score={score} />
       <p className="verdict">{verdict}</p>
+      <p className="percentile">
+        무작위 생일 {SAMPLE_SIZE.toLocaleString('ko-KR')}건을 돌려보면
+        {' '}이 점수는 <b>상위 {topPercentFor(score)}%</b>입니다
+      </p>
 
       {agreement && (
         <div className="block agree">

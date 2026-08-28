@@ -25,8 +25,11 @@ const FAVOR: Record<'strong' | 'weak', Record<TenGodGroup, number>> = {
 const GAN_WEIGHT = 1.0
 const JI_WEIGHT = 1.4
 
-/** 전성기를 유년기 대운에서 뽑으면 말이 안 되므로 이 나이 이후에서만 고른다. */
-const PEAK_MIN_AGE = 20
+/**
+ * 전성기를 유년기 대운에서 뽑으면 말이 안 되므로 이 나이 이후에 시작하는 것만 고른다.
+ * 끝나는 나이로 걸면 12~21세 구간이 통과해버린다.
+ */
+const PEAK_MIN_START_AGE = 20
 
 export interface DaeunPeriod {
   startAge: number
@@ -169,7 +172,7 @@ export function computeDaeun(input: BirthInput, today = new Date()): DaeunResult
 
   // 전성기는 점수가 가장 높은 대운으로 본다.
   // 단 유년기는 후보에서 뺀다. 다섯 살이 인생의 전성기라는 결과는 아무 의미가 없다.
-  const candidates = periods.filter((p) => p.endAge >= PEAK_MIN_AGE)
+  const candidates = periods.filter((p) => p.startAge >= PEAK_MIN_START_AGE)
   let peak: DaeunPeriod | null = null
   for (const p of candidates) {
     if (!peak || p.score > peak.score) peak = p

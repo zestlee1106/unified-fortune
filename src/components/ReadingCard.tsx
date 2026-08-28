@@ -23,7 +23,7 @@ export function ReadingCard({ reading, forceOpen }: Props) {
           <span className="reading-name">{reading.name}</span>
           <span className="reading-headline">{reading.headline}</span>
         </span>
-        <span className="reading-toggle">{open ? '\u2212' : '+'}</span>
+        <span className="reading-toggle">{open ? '−' : '+'}</span>
       </button>
 
       {open && (
@@ -41,7 +41,7 @@ export function ReadingCard({ reading, forceOpen }: Props) {
             ))}
           </dl>
 
-          {reading.caveat && <p className="caveat">\u203b {reading.caveat}</p>}
+          {reading.caveat && <p className="caveat">※ {reading.caveat}</p>}
         </div>
       )}
     </article>

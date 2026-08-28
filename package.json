@@ -10,7 +10,9 @@
     "preview": "vite preview",
     "smoke": "tsx scripts/smoke.ts",
     "dist": "tsx scripts/distribution.ts",
-    "ddi": "tsx scripts/ddi-ratio.ts"
+    "ddi": "tsx scripts/ddi-ratio.ts",
+    "percentile": "tsx scripts/build-percentile.ts",
+    "rarity": "tsx scripts/rarity-check.ts"
   },
   "dependencies": {
     "lunar-javascript": "^1.7.7",

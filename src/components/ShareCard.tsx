@@ -1,7 +1,9 @@
 import { useRef, useState } from 'react'
 import { AXIS_BY_ID } from '../core/axes'
 import { josa } from '../core/josa'
+import { computeRarity, rarityCompact, rarityKorea } from '../core/rarity'
 import { shareUrlFor } from '../core/shareUrl'
+import { topPercentFor } from '../data/percentile'
 import type { Consensus } from '../core/consensus'
 import type { BirthInput, Reading } from '../core/types'
 import type { DaeunResult } from '../engines/daeun'
@@ -32,6 +34,7 @@ const SANS = "'Pretendard Variable', Pretendard, -apple-system, sans-serif"
 
 function draw(
   canvas: HTMLCanvasElement,
+  input: BirthInput,
   consensus: Consensus,
   readings: Reading[],
   daeun: DaeunResult,
@@ -81,7 +84,20 @@ function draw(
   ctx.roundRect(gx, 424, (gw * consensus.score) / 100, 10, 5)
   ctx.fill()
 
-  let y = 530
+  // 점수만으로는 높은지 낮은지 모른다. 백분위와 희귀도를 나란히 붙인다.
+  const rarity = computeRarity(input)
+  ctx.textAlign = 'center'
+  ctx.fillStyle = C.gold
+  ctx.font = font(30, '700', true)
+  ctx.fillText(
+    `상위 ${topPercentFor(consensus.score)}%   ·   ${rarityCompact(rarity)}`,
+    W / 2, 500,
+  )
+  ctx.fillStyle = C.dim
+  ctx.font = font(22, '600')
+  ctx.fillText(rarityKorea(rarity), W / 2, 536)
+
+  let y = 620
 
   if (consensus.agreement) {
     ctx.textAlign = 'left'
@@ -133,8 +149,25 @@ function draw(
   }
 
   // 나머지를 2열로 깔아서 "다 들어있다"가 한눈에 보이게 한다.
+  // 행 높이를 먼저 고정한다. 남는 자리에 맞춰 늘리면 위 블록이 길어졌을 때 글자가 겹친다.
+  const ROW_H = 64
+  const BOX_PAD = 52
+  const cols = 2
+  const available = H - 110 - y
+
+  let shown = readings
+  let rows = Math.ceil(shown.length / cols)
+  let boxH = rows * ROW_H + BOX_PAD
+
+  if (boxH > available) {
+    // 자리가 모자라면 들어가는 만큼만 싣는다. 겹쳐 보이는 것보다 낫다.
+    const fitRows = Math.max(2, Math.floor((available - BOX_PAD) / ROW_H))
+    shown = readings.slice(0, fitRows * cols)
+    rows = fitRows
+    boxH = fitRows * ROW_H + BOX_PAD
+  }
+
   const boxTop = y
-  const boxH = H - boxTop - 110
   ctx.fillStyle = 'rgba(255,255,255,0.035)'
   ctx.strokeStyle = 'rgba(255,255,255,0.07)'
   ctx.lineWidth = 1
@@ -143,30 +176,35 @@ function draw(
   ctx.fill()
   ctx.stroke()
 
-  const cols = 2
-  const rows = Math.ceil(readings.length / cols)
   const colW = (gw - 24) / cols
-  const rowH = (boxH - 56) / rows
 
   ctx.textAlign = 'left'
-  readings.forEach((r, i) => {
+  shown.forEach((r, i) => {
     const col = Math.floor(i / rows)
     const row = i % rows
     const x = gx + col * (colW + 24)
-    const cy = boxTop + 34 + row * rowH + 22
+    const cy = boxTop + BOX_PAD / 2 + row * ROW_H + 18
 
     ctx.fillStyle = C.dim
     ctx.font = font(19, '700')
     ctx.fillText(clip(ctx, r.name, colW), x, cy)
     ctx.fillStyle = C.text
     ctx.font = font(25, '700', true)
-    ctx.fillText(clip(ctx, r.headline, colW), x, cy + 32)
+    ctx.fillText(clip(ctx, r.headline, colW), x, cy + 30)
   })
 
+  // 자리가 모자라 잘렸으면 몇 개가 더 있는지 밝힌다.
+  // 잘린 걸 숨기면 "다 들어있다"는 이 카드의 요점이 오히려 약해진다.
+  const hidden = readings.length - shown.length
   ctx.textAlign = 'center'
   ctx.fillStyle = C.dim
-  ctx.font = font(22, '500')
-  ctx.fillText('전부 재미로 보는 것입니다', W / 2, H - 48)
+  ctx.font = font(20, '600')
+  ctx.fillText(
+    hidden > 0
+      ? `외 ${hidden}가지 더 · 전부 재미로 보는 것입니다`
+      : '전부 재미로 보는 것입니다',
+    W / 2, H - 48,
+  )
 }
 
 /** 줄바꿈하며 그리고, 마지막으로 그린 줄의 y를 돌려준다. */
@@ -200,13 +238,14 @@ function clip(ctx: CanvasRenderingContext2D, text: string, maxW: number) {
 
 async function renderFile(
   canvas: HTMLCanvasElement,
+  input: BirthInput,
   consensus: Consensus,
   readings: Reading[],
   daeun: DaeunResult,
 ): Promise<File | null> {
   // 웹폰트가 아직 안 왔으면 canvas가 기본 폰트로 그려버린다.
   await document.fonts.ready
-  draw(canvas, consensus, readings, daeun)
+  draw(canvas, input, consensus, readings, daeun)
   const blob = await new Promise<Blob | null>((resolve) =>
     canvas.toBlob(resolve, 'image/png'),
   )
@@ -219,9 +258,10 @@ export function ShareCard({ input, consensus, readings, daeun }: Props) {
   const [toast, setToast] = useState('')
 
   const url = shareUrlFor(input)
+  const rarity = computeRarity(input)
   const text = daeun.peak
-    ? `열한 가지 점술이 ${consensus.score}% 동의했습니다. 전성기는 ${daeun.peak.startAge}~${daeun.peak.endAge}세.`
-    : `열한 가지 점술이 ${consensus.score}% 동의했습니다.`
+    ? `열한 가지 점술이 ${consensus.score}% 동의. ${rarityCompact(rarity)} 조합이고 전성기는 ${daeun.peak.startAge}~${daeun.peak.endAge}세.`
+    : `열한 가지 점술이 ${consensus.score}% 동의. ${rarityCompact(rarity)} 조합입니다.`
 
   const say = (msg: string) => {
     setToast(msg)
@@ -245,7 +285,7 @@ export function ShareCard({ input, consensus, readings, daeun }: Props) {
     const canvas = ref.current
     if (!canvas) return
 
-    const file = await renderFile(canvas, consensus, readings, daeun)
+    const file = await renderFile(canvas, input, consensus, readings, daeun)
 
     if (file && navigator.canShare?.({ files: [file] })) {
       try {
@@ -272,7 +312,7 @@ export function ShareCard({ input, consensus, readings, daeun }: Props) {
   const saveImage = async () => {
     const canvas = ref.current
     if (!canvas) return
-    const file = await renderFile(canvas, consensus, readings, daeun)
+    const file = await renderFile(canvas, input, consensus, readings, daeun)
     if (!file) return
     const href = URL.createObjectURL(file)
     const a = document.createElement('a')
