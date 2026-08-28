@@ -6,6 +6,7 @@ import { ShareCard } from './components/ShareCard'
 import { Timeline } from './components/Timeline'
 import { TodayCard } from './components/TodayCard'
 import { buildConsensus } from './core/consensus'
+import { fromQuery, toQuery } from './core/shareUrl'
 import { computeDaeun } from './engines/daeun'
 import { computeToday } from './engines/today'
 import { runAll } from './engines'
@@ -13,8 +14,25 @@ import type { BirthInput } from './core/types'
 import './App.css'
 
 export default function App() {
-  const [input, setInput] = useState<BirthInput | null>(null)
+  // 공유 링크로 들어온 경우 주소에 실린 값으로 바로 결과를 띄운다.
+  const [input, setInput] = useState<BirthInput | null>(() =>
+    fromQuery(window.location.search),
+  )
   const [allOpen, setAllOpen] = useState(false)
+
+  const submit = (next: BirthInput) => {
+    setInput(next)
+    // 새로고침하거나 링크를 복사해도 같은 결과가 열리도록 주소를 바꿔둔다.
+    window.history.replaceState(null, '', toQuery(next))
+    window.scrollTo({ top: 0 })
+  }
+
+  const reset = () => {
+    setInput(null)
+    setAllOpen(false)
+    window.history.replaceState(null, '', window.location.pathname)
+    window.scrollTo({ top: 0 })
+  }
 
   const result = useMemo(() => {
     if (!input) return null
@@ -46,7 +64,7 @@ export default function App() {
             <br />
             그리고 <b>그것들이 서로 어디서 동의하고 어디서 싸우는지</b>를 보여줍니다.
           </p>
-          <InputForm onSubmit={setInput} />
+          <InputForm onSubmit={submit} />
         </>
       )}
 
@@ -56,6 +74,7 @@ export default function App() {
 
           <Summary consensus={result.consensus} readings={result.readings} />
           <ShareCard
+            input={input!}
             consensus={result.consensus}
             readings={result.readings}
             daeun={result.daeun}
@@ -75,7 +94,7 @@ export default function App() {
             ))}
           </div>
 
-          <button className="submit ghost" onClick={() => setInput(null)}>
+          <button className="submit ghost" onClick={reset}>
             다시 하기
           </button>
         </>

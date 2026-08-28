@@ -703,3 +703,26 @@ input:disabled { opacity: 0.35; }
   .header h1 { font-size: 32px; }
   .daeun-row { grid-template-columns: 46px 1fr 74px 38px; gap: 8px; }
 }
+
+/* ---------- 공유 ---------- */
+.share { margin-bottom: 14px; }
+.share-sub {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 8px;
+}
+.share-mini {
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  color: var(--text-2);
+  padding: 13px;
+  font-size: 13px;
+  font-weight: 700;
+  font-family: var(--sans);
+  cursor: pointer;
+  transition: all 0.14s;
+}
+.share-mini:hover { border-color: var(--text-3); color: var(--text); }
+.share-note { margin-top: 12px; min-height: 2.6em; }

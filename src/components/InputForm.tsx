@@ -18,7 +18,7 @@ interface Props {
 }
 
 export function InputForm({ onSubmit }: Props) {
-  const [birth, setBirth] = useState('1995-07-14')
+  const [birth, setBirth] = useState('1997-11-06')
   const [time, setTime] = useState('09:30')
   const [timeUnknown, setTimeUnknown] = useState(false)
   const [mbti, setMbti] = useState('')

@@ -1,11 +1,13 @@
 import { useRef, useState } from 'react'
 import { AXIS_BY_ID } from '../core/axes'
 import { josa } from '../core/josa'
+import { shareUrlFor } from '../core/shareUrl'
 import type { Consensus } from '../core/consensus'
-import type { Reading } from '../core/types'
+import type { BirthInput, Reading } from '../core/types'
 import type { DaeunResult } from '../engines/daeun'
 
 interface Props {
+  input: BirthInput
   consensus: Consensus
   readings: Reading[]
   daeun: DaeunResult
@@ -28,7 +30,6 @@ const C = {
 const SERIF = "'Gowun Batang', 'Apple SD Gothic Neo', serif"
 const SANS = "'Pretendard Variable', Pretendard, -apple-system, sans-serif"
 
-/** 서버가 없어서 OG 이미지를 못 만든다. 대신 canvas로 카드를 그려 PNG로 저장시킨다. */
 function draw(
   canvas: HTMLCanvasElement,
   consensus: Consensus,
@@ -64,7 +65,6 @@ function draw(
   ctx.font = font(26, '600')
   ctx.fillText('열한 가지를 한 번에', W / 2, 108)
 
-  // 합의도 숫자
   ctx.fillStyle = C.text
   ctx.font = font(180, '700', true)
   ctx.fillText(`${consensus.score}%`, W / 2, 316)
@@ -72,7 +72,6 @@ function draw(
   ctx.font = font(28, '600')
   ctx.fillText('점술들이 서로 동의한 정도', W / 2, 372)
 
-  // 게이지
   ctx.fillStyle = 'rgba(255,255,255,0.07)'
   ctx.beginPath()
   ctx.roundRect(gx, 424, gw, 10, 5)
@@ -88,7 +87,7 @@ function draw(
     ctx.textAlign = 'left'
     ctx.fillStyle = C.jade
     ctx.font = font(26, '700')
-    ctx.fillText(`\u2713 ${consensus.agreement.voters}가지가 동의`, gx, y)
+    ctx.fillText(`✓ ${consensus.agreement.voters}가지가 동의`, gx, y)
     y += 52
     ctx.fillStyle = C.text
     ctx.font = font(42, '700', true)
@@ -104,7 +103,7 @@ function draw(
     ctx.textAlign = 'left'
     ctx.fillStyle = C.coral
     ctx.font = font(26, '700')
-    ctx.fillText('\u2717 여기서 정면으로 갈림', gx, y)
+    ctx.fillText('✗ 여기서 정면으로 갈림', gx, y)
     y += 50
     ctx.fillStyle = C.text
     ctx.font = font(36, '700', true)
@@ -121,7 +120,7 @@ function draw(
     ctx.textAlign = 'left'
     ctx.fillStyle = C.gold
     ctx.font = font(26, '700')
-    ctx.fillText('\u2605 인생의 전성기', gx, y)
+    ctx.fillText('★ 인생의 전성기', gx, y)
     y += 50
     ctx.fillStyle = C.text
     ctx.font = font(38, '700', true)
@@ -199,34 +198,107 @@ function clip(ctx: CanvasRenderingContext2D, text: string, maxW: number) {
   return `${t}…`
 }
 
-export function ShareCard({ consensus, readings, daeun }: Props) {
-  const ref = useRef<HTMLCanvasElement>(null)
-  const [done, setDone] = useState(false)
+async function renderFile(
+  canvas: HTMLCanvasElement,
+  consensus: Consensus,
+  readings: Reading[],
+  daeun: DaeunResult,
+): Promise<File | null> {
+  // 웹폰트가 아직 안 왔으면 canvas가 기본 폰트로 그려버린다.
+  await document.fonts.ready
+  draw(canvas, consensus, readings, daeun)
+  const blob = await new Promise<Blob | null>((resolve) =>
+    canvas.toBlob(resolve, 'image/png'),
+  )
+  if (!blob) return null
+  return new File([blob], '통합점사이트-결과.png', { type: 'image/png' })
+}
 
-  const save = async () => {
+export function ShareCard({ input, consensus, readings, daeun }: Props) {
+  const ref = useRef<HTMLCanvasElement>(null)
+  const [toast, setToast] = useState('')
+
+  const url = shareUrlFor(input)
+  const text = daeun.peak
+    ? `열한 가지 점술이 ${consensus.score}% 동의했습니다. 전성기는 ${daeun.peak.startAge}~${daeun.peak.endAge}세.`
+    : `열한 가지 점술이 ${consensus.score}% 동의했습니다.`
+
+  const say = (msg: string) => {
+    setToast(msg)
+    window.setTimeout(() => setToast(''), 2600)
+  }
+
+  const copyLink = async () => {
+    try {
+      await navigator.clipboard.writeText(url)
+      say('링크를 복사했습니다. 붙여넣으면 이 결과가 그대로 열립니다.')
+    } catch {
+      say('복사에 실패했습니다. 주소창의 주소를 그대로 쓰시면 됩니다.')
+    }
+  }
+
+  /**
+   * 모바일에서는 OS 공유 시트가 떠서 카톡을 고를 수 있고 이미지까지 같이 넘어간다.
+   * 데스크톱 브라우저는 대부분 지원하지 않아서 링크 복사로 떨어진다.
+   */
+  const share = async () => {
     const canvas = ref.current
     if (!canvas) return
-    // 웹폰트가 아직 안 왔으면 canvas가 기본 폰트로 그려버린다.
-    await document.fonts.ready
-    draw(canvas, consensus, readings, daeun)
-    canvas.toBlob((blob) => {
-      if (!blob) return
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = '통합점사이트-결과.png'
-      a.click()
-      URL.revokeObjectURL(url)
-      setDone(true)
-    }, 'image/png')
+
+    const file = await renderFile(canvas, consensus, readings, daeun)
+
+    if (file && navigator.canShare?.({ files: [file] })) {
+      try {
+        await navigator.share({ files: [file], text, url })
+        return
+      } catch (e) {
+        // 사용자가 공유 시트를 닫은 것은 실패가 아니다.
+        if ((e as Error).name === 'AbortError') return
+      }
+    }
+
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: '통합 점 사이트', text, url })
+        return
+      } catch (e) {
+        if ((e as Error).name === 'AbortError') return
+      }
+    }
+
+    await copyLink()
+  }
+
+  const saveImage = async () => {
+    const canvas = ref.current
+    if (!canvas) return
+    const file = await renderFile(canvas, consensus, readings, daeun)
+    if (!file) return
+    const href = URL.createObjectURL(file)
+    const a = document.createElement('a')
+    a.href = href
+    a.download = file.name
+    a.click()
+    URL.revokeObjectURL(href)
+    say('이미지를 저장했습니다.')
   }
 
   return (
     <div className="share">
-      <button className="submit ghost" onClick={save}>
-        결과 카드 이미지로 저장
+      <button className="submit" onClick={share}>
+        공유하기
       </button>
-      {done && <p className="hint center">저장했습니다. 그대로 올리면 됩니다.</p>}
+      <div className="share-sub">
+        <button className="share-mini" onClick={copyLink}>
+          링크 복사
+        </button>
+        <button className="share-mini" onClick={saveImage}>
+          이미지 저장
+        </button>
+      </div>
+      <p className="hint center share-note">
+        {toast || '링크를 열면 이 결과가 그대로 나옵니다. 계산에 쓴 값만 주소에 담기고 서버로는 아무것도 가지 않습니다.'}
+      </p>
       <canvas ref={ref} style={{ display: 'none' }} />
     </div>
   )
