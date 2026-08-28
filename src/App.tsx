@@ -6,6 +6,7 @@ import { ShareCard } from './components/ShareCard'
 import { Timeline } from './components/Timeline'
 import { TodayCard } from './components/TodayCard'
 import { buildConsensus } from './core/consensus'
+import { buildPersona } from './core/persona'
 import { fromQuery, toQuery } from './core/shareUrl'
 import { computeDaeun } from './engines/daeun'
 import { computeToday } from './engines/today'
@@ -38,12 +39,16 @@ export default function App() {
     if (!input) return null
     const readings = runAll(input)
     const daeun = computeDaeun(input)
-    return {
-      readings,
-      consensus: buildConsensus(readings),
-      daeun,
-      today: computeToday(input, daeun),
-    }
+
+    // 페르소나 한 줄이 이미 한 축을 쓰므로, 합의 문장은 그 축을 빼고 고른다.
+    // 같은 축을 두 번 말하면 정보가 늘지 않고 반복으로만 읽힌다.
+    const first = buildConsensus(readings)
+    const persona = buildPersona(input, first)
+    const consensus = persona
+      ? buildConsensus(readings, persona.axisId)
+      : first
+
+    return { readings, consensus, persona, daeun, today: computeToday(input, daeun) }
   }, [input])
 
   return (
@@ -72,7 +77,12 @@ export default function App() {
         <>
           <TodayCard today={result.today} />
 
-          <Summary consensus={result.consensus} readings={result.readings} />
+          <Summary
+            input={input!}
+            persona={result.persona}
+            consensus={result.consensus}
+            readings={result.readings}
+          />
           <ShareCard
             input={input!}
             consensus={result.consensus}

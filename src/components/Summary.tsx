@@ -1,17 +1,29 @@
 import { AXIS_BY_ID } from '../core/axes'
 import { josa } from '../core/josa'
+import { supportersOf } from '../core/persona'
+import type { Persona } from '../core/persona'
+import { computeRarity, rarityHeadline, rarityKorea } from '../core/rarity'
 import type { Consensus } from '../core/consensus'
-import type { Reading } from '../core/types'
+import type { BirthInput, Reading } from '../core/types'
 
 interface Props {
+  input: BirthInput
+  persona: Persona | null
   consensus: Consensus
   readings: Reading[]
 }
 
-export function Summary({ consensus, readings }: Props) {
+export function Summary({ input, persona, consensus, readings }: Props) {
   const { score, agreement, conflict } = consensus
-  // 탄생석과 오늘의 운세는 성향 축에 투표하지 않는다. 합의도는 나머지로만 계산한다.
+  // 탄생석은 성향 축에 투표하지 않는다. 합의도는 나머지로만 계산한다.
   const voting = readings.filter((r) => Object.keys(r.axes).length > 0).length
+
+  const rarity = computeRarity(input)
+  // 페르소나 축을 지지한 점술과, 합의 문장을 지지한 점술은 서로 다른 축이라 따로 모은다.
+  const personaBackers = persona ? supportersOf(consensus, persona.axisId, readings) : []
+  const agreeBackers = agreement
+    ? supportersOf(consensus, agreement.summary.axisId, readings)
+    : []
 
   const verdict =
     score >= 75 ? '이례적으로 말이 맞는 편'
@@ -21,7 +33,39 @@ export function Summary({ consensus, readings }: Props) {
 
   return (
     <section className="card summary">
-      <p className="kicker">{readings.length + 2}가지가 본 당신</p>
+      <p className="kicker">{readings.length + 2}가지를 겹쳐본 결과</p>
+
+      {persona && (
+        <div className="persona">
+          <p className="persona-line">{persona.line}</p>
+          <p className="persona-note">
+            사주의 {persona.element} 기운에, {personaBackers.length}가지 점술이 같은 편에 선
+            {' '}{AXIS_BY_ID[persona.axisId].neg}·{AXIS_BY_ID[persona.axisId].pos} 축을 겹쳐서 나온 문장입니다.
+            어느 한 점술도 혼자서는 이 말을 못 합니다.
+          </p>
+        </div>
+      )}
+
+      <div className="rarity">
+        <p className="rarity-big">{rarityHeadline(rarity)}</p>
+        <p className="rarity-sub">{rarityKorea(rarity)}</p>
+        <div className="rarity-factors">
+          {rarity.factors.map((f) => (
+            <div className="rarity-factor" key={f.label}>
+              <span>{f.label}</span>
+              <b>{f.value}</b>
+            </div>
+          ))}
+        </div>
+        <p className="caveat">
+          ※ 사주도 띠도 별자리도 결국 생일 하나에서 나오기 때문에 따로 곱하지 않았습니다.
+          그렇게 하면 숫자만 부풀려집니다. 혈액형은 한국 실제 분포를, MBTI는 열여섯 유형이
+          고르게 나온다고 가정한 어림값입니다.
+          {rarity.timeUnknown && ' 태어난 시각을 넣으면 훨씬 희귀해집니다.'}
+        </p>
+      </div>
+
+      <div className="divider" />
 
       <Dial score={score} />
       <p className="verdict">{verdict}</p>
@@ -33,6 +77,13 @@ export function Summary({ consensus, readings }: Props) {
             {agreement.voters}가지가 같은 말을 합니다
           </p>
           <p className="block-body">{agreement.sentence}</p>
+          {agreeBackers.length > 0 && (
+            <div className="chips">
+              {agreeBackers.map((name) => (
+                <span className="mini-chip" key={name}>{name}</span>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
@@ -81,7 +132,7 @@ export function Summary({ consensus, readings }: Props) {
   )
 }
 
-/** 합의도를 원형 눈금으로 보여준다. 이 화면에서 제일 먼저 눈에 들어와야 하는 숫자다. */
+/** 합의도를 원형 눈금으로 보여준다. */
 function Dial({ score }: { score: number }) {
   const size = 190
   const stroke = 7

@@ -32,7 +32,13 @@ function stddev(values: number[], mean: number): number {
   return Math.sqrt(variance)
 }
 
-export function buildConsensus(readings: Reading[]): Consensus {
+/**
+ * @param excludeAxis 이미 다른 자리에서 쓴 축. 요약 화면이 같은 축을 두 번 말하지 않게 한다.
+ */
+export function buildConsensus(
+  readings: Reading[],
+  excludeAxis?: AxisId,
+): Consensus {
   const summaries: AxisSummary[] = []
 
   for (const axis of AXES) {
@@ -81,7 +87,7 @@ export function buildConsensus(readings: Reading[]): Consensus {
 
   // 동의: 편차가 작으면서 한쪽으로 확실히 쏠린 축
   const agreementSummary = [...summaries]
-    .filter((s) => s.voters >= 3)
+    .filter((s) => s.voters >= 3 && s.axisId !== excludeAxis)
     .sort(
       (a, b) =>
         Math.abs(b.mean) * (1 - b.spread) - Math.abs(a.mean) * (1 - a.spread),
